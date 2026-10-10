@@ -65,7 +65,7 @@ function RevealCard({ card }) {
       <div
         className={`fade-anim absolute inset-0 transition-opacity duration-500 ${
           open ? "opacity-0" : "opacity-100"
-        } md:group-hover:opacity-0`}
+        } group-hover:opacity-0`}
       >
         <img
           src={getImageUrl(card.image)}
@@ -88,7 +88,7 @@ function RevealCard({ card }) {
       <div
         className={`fade-anim absolute inset-0 transition-opacity duration-500 ${
           open ? "opacity-100" : "opacity-0"
-        } md:group-hover:opacity-100`}
+        } group-hover:opacity-100`}
       >
         <img
           src={getImageUrl(card.image)}
@@ -136,7 +136,7 @@ export default function Destacadas() {
           className="mb-12 md:mb-16"
         >
           <h2 className="font-heading font-medium text-4xl md:text-5xl lg:text-6xl tracking-tight text-black leading-[1.05]">
-            Repuestos /<span className=" font-bold text-white"> otros</span>
+            Repuestos <span className=" font-bold text-white">/ otros</span>
           </h2>
         </motion.div>
 
