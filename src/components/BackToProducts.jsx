@@ -13,22 +13,33 @@ export default function BackToProducts() {
   );
 
   useEffect(() => {
-    const targets = document.querySelectorAll("[data-back-products]");
-    if (!targets.length) return;
+    let raf = 0;
 
-    const visible = new Set();
-    const obs = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) visible.add(entry.target);
-          else visible.delete(entry.target);
-        });
-        setShow(visible.size > 0);
-      },
-      { rootMargin: "0px 0px -80% 0px" },
-    );
-    targets.forEach((t) => obs.observe(t));
-    return () => obs.disconnect();
+    const update = () => {
+      raf = 0;
+      const vh = window.innerHeight;
+      let visible = false;
+      document.querySelectorAll("[data-back-products]").forEach((el) => {
+        const r = el.getBoundingClientRect();
+        /* Visible mientras la sección ocupa la pantalla; se oculta apenas
+           su final sube por encima del 90% (ya asoma la sección siguiente) */
+        if (r.top < vh * 0.5 && r.bottom > vh * 0.9) visible = true;
+      });
+      setShow((prev) => (prev === visible ? prev : visible));
+    };
+
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
   }, []);
 
   const back = () => {
