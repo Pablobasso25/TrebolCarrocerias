@@ -352,7 +352,14 @@ const PRODUCTOS_BG =
  * @param {string} [props.sizeClass]
  * @param {string} [props.backTextClass]
  */
-function LogoTile({ product, index, selected, onSelect, sizeClass, backTextClass }) {
+function LogoTile({
+  product,
+  index,
+  selected,
+  onSelect,
+  sizeClass,
+  backTextClass,
+}) {
   const isSelected = selected === index;
   return (
     <button
@@ -363,27 +370,23 @@ function LogoTile({ product, index, selected, onSelect, sizeClass, backTextClass
       title={product.title}
       className={`group shrink-0 rounded-2xl transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-trebol-400 [perspective:1000px] ${
         isSelected
-          ? "ring-1 ring-white/20 shadow-[0_0_45px_rgba(255,255,255,0.20)]"
-          : "hover:-translate-y-1"
+          ? "shadow-[0px_18px_10px_-1px_rgba(0,0,0,0.9)] -translate-y-5"
+          : "hover:-translate-y-0.5"
       }`}
     >
-      {/* Gira en hover o cuando queda seleccionado */}
+      {/* Gira al hover solo si NO está seleccionado */}
       <span
         className={`relative grid place-items-center transition-transform duration-500 [transform-style:preserve-3d] ${
           sizeClass ||
           "h-20 w-20 sm:h-16 sm:w-16 lg:h-24 lg:w-24 xl:h-36 xl:w-36"
-        } ${
-          isSelected
-            ? "[transform:rotateY(180deg)]"
-            : "group-hover:[transform:rotateY(180deg)]"
-        }`}
+        } ${isSelected ? "" : "group-hover:[transform:rotateY(180deg)]"}`}
       >
-        {/* Frente: logo */}
+        {/* Frente: logo (sin la sombra incrustada del PNG) */}
         <img
-          src={getLogoUrl(product.iconImage ?? "")}
+          src={getLogoUrl(product.iconImage ?? "", { cropTileShadow: true })}
           alt=""
           aria-hidden="true"
-          className="absolute inset-0 h-full w-full object-contain [backface-visibility:hidden]"
+          className="absolute inset-0 h-full w-full rounded-[23px] object-contain [backface-visibility:hidden]"
           loading="lazy"
           decoding="async"
         />
@@ -424,14 +427,52 @@ export default function Productos() {
   );
   const flow = reducedMotion || isMobile;
 
-  /* Carrusel de logos (solo mobile): un logo por vez */
-  const [logoIndex, setLogoIndex] = useState(0);
+  /* Carrusel de logos (solo mobile): posición con clones para loop infinito.
+     0 y N+1 son clones del último y del primero respectivamente. */
+  const [logoPos, setLogoPos] = useState(1);
+  const [logoInstant, setLogoInstant] = useState(false);
 
   /* Selección de logo: flipea y salta al producto */
   const handleSelectLogo = (/** @type {number} */ i) => {
     setSelectedLogo(i);
     scrollToProduct(i);
   };
+
+  /* Flechas del carrusel de logos */
+  const moveLogo = (/** @type {number} */ dir) => {
+    if (logoInstant) return;
+    setLogoPos((p) => Math.min(Math.max(p + dir, 0), products.length + 1));
+  };
+
+  /* Al terminar la animación sobre un clon, reubica sin transición */
+  const onLogoTransitionEnd = (
+    /** @type {import("react").TransitionEvent<HTMLDivElement>} */ e,
+  ) => {
+    if (e.target !== e.currentTarget || e.propertyName !== "transform") return;
+    if (logoPos === products.length + 1) {
+      setLogoInstant(true);
+      setLogoPos(1);
+    } else if (logoPos === 0) {
+      setLogoInstant(true);
+      setLogoPos(products.length);
+    }
+  };
+
+  /* Reactiva la transición en el frame siguiente al reubicado */
+  useEffect(() => {
+    if (!logoInstant) return;
+    const id = requestAnimationFrame(() => setLogoInstant(false));
+    return () => cancelAnimationFrame(id);
+  }, [logoInstant]);
+
+  /* Fila con clones + logo actual para el caption */
+  const logoItems = [
+    { product: products[products.length - 1], index: products.length - 1 },
+    ...products.map((product, index) => ({ product, index })),
+    { product: products[0], index: 0 },
+  ];
+  const currentLogo =
+    products[(logoPos - 1 + products.length) % products.length];
 
   /* prefers-reduced-motion */
   useEffect(() => {
@@ -770,45 +811,52 @@ export default function Productos() {
             transition={{ duration: 0.8, ease: "easeOut", delay: 0.25 }}
           >
             {isMobile ? (
-              <div className="relative mx-auto max-w-xs">
-                <div className="mx-auto w-40 overflow-hidden py-2">
-                  <div
-                    className="slide-anim flex gap-2"
-                    style={{ transform: `translateX(-${logoIndex * 168}px)` }}
-                  >
-                    {products.map((product, i) => (
-                      <LogoTile
-                        key={product.title}
-                        product={product}
-                        index={i}
-                        selected={selectedLogo}
-                        onSelect={handleSelectLogo}
-                        sizeClass="h-40 w-40"
-                        backTextClass="text-sm"
-                      />
-                    ))}
+              <div className="mx-auto w-full">
+                <div className="relative">
+                  <div className="mx-auto w-52 overflow-hidden py-4">
+                    <div
+                      className={`slide-anim flex gap-2 ${
+                        logoInstant ? "slide-reset" : ""
+                      }`}
+                      style={{
+                        transform: `translateX(-${logoPos * 216}px)`,
+                      }}
+                      onTransitionEnd={onLogoTransitionEnd}
+                    >
+                      {logoItems.map((item, idx) => (
+                        <LogoTile
+                          key={`${item.index}-${idx}`}
+                          product={item.product}
+                          index={item.index}
+                          selected={null}
+                          onSelect={handleSelectLogo}
+                          sizeClass="h-52 w-52"
+                          backTextClass="text-base"
+                        />
+                      ))}
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => moveLogo(-1)}
+                    aria-label="Logo anterior"
+                    className="absolute left-0 top-1/2 z-10 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/15 bg-black/60 text-white backdrop-blur transition"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveLogo(1)}
+                    aria-label="Logo siguiente"
+                    className="absolute right-0 top-1/2 z-10 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/15 bg-black/60 text-white backdrop-blur transition"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setLogoIndex(
-                      (i) => (i - 1 + products.length) % products.length,
-                    )
-                  }
-                  aria-label="Logo anterior"
-                  className="absolute left-0 top-1/2 z-10 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/15 bg-black/60 text-white backdrop-blur transition"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLogoIndex((i) => (i + 1) % products.length)}
-                  aria-label="Logo siguiente"
-                  className="absolute right-0 top-1/2 z-10 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/15 bg-black/60 text-white backdrop-blur transition"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </button>
+                {/* Nombre del producto actual */}
+                <p className="mt-3 text-center font-heading text-sm font-bold uppercase tracking-[0.2em] text-white/85">
+                  {currentLogo.title}
+                </p>
               </div>
             ) : (
               <div className="-mx-4 flex items-center gap-2 px-4 pb-2 sm:gap-4 md:justify-center md:gap-4 lg:gap-6 lg:pb-0 xl:justify-between">
